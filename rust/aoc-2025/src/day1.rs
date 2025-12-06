@@ -75,7 +75,7 @@ fn solve_puzzle2(inputs: &Vec<Input>) -> i16 {
   zero_traversals.sum()
 }
 
-fn main() -> io::Result<()> {
+pub fn run() -> io::Result<()> {
   let input_lines = load_input()?;
   let inputs = input_lines
     .iter()
