@@ -1,14 +1,8 @@
 use std::cmp::max;
-use std::fs::File;
 use std::io;
-use std::io::{BufRead, BufReader};
 use std::str::FromStr;
 
-fn load_input() -> io::Result<Vec<String>> {
-  let file = File::open("../../puzzleInput/day1.txt").expect("Failed to open input file");
-  let reader = BufReader::new(file);
-  reader.lines().collect::<io::Result<Vec<String>>>()
-}
+use crate::shared::load_input_lines;
 
 #[derive(Debug)]
 enum Input {
@@ -76,7 +70,7 @@ fn solve_puzzle2(inputs: &Vec<Input>) -> i16 {
 }
 
 pub fn run() -> io::Result<()> {
-  let input_lines = load_input()?;
+  let input_lines = load_input_lines("day1.txt")?;
   let inputs = input_lines
     .iter()
     .map(|line| parse_input(line))

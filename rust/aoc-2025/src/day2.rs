@@ -1,14 +1,4 @@
-use std::fs::File;
-use std::io::BufReader;
-use std::io::{self, Read};
-
-fn load_input() -> io::Result<String> {
-  let file = File::open("../../puzzleInput/day2.txt").expect("Failed to open input file");
-  let mut reader = BufReader::new(file);
-  let mut buf = String::new();
-  reader.read_to_string(&mut buf)?;
-  Ok(buf)
-}
+use crate::shared::load_input_str;
 
 fn parse_input(input: &str) -> Vec<(i64, i64)> {
   let pairs = input.split(",");
@@ -79,7 +69,7 @@ mod puzzle2 {
 }
 
 pub fn run() {
-  let input = load_input().unwrap();
+  let input = load_input_str("day2.txt").unwrap();
   let parsed_input = parse_input(&input);
   let puz1 = puzzle1::solve(&parsed_input);
   let puz2 = puzzle2::solve(&parsed_input);
