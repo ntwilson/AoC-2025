@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::str::FromStr;
 
 use crate::shared::*;
@@ -10,77 +11,67 @@ fn parse_battery_bank(input: &str) -> Result<Vec<u64>, <u64 as FromStr>::Err> {
     .collect()
 }
 
-mod puzzle1 {
-  use std::cmp::Ordering;
-
-  pub fn maximize_bank(bank: &[u64]) -> Result<u64, &'static str> {
-    let (idx, first_digit) = (0..)
-      .zip(bank[0..=(bank.len() - 2)].iter())
+fn maximize_bank(bank: &[u64], size: usize) -> Result<u64, String> {
+  let indexed = (0..).zip(bank).collect::<Vec<_>>();
+  let mut start = 0;
+  let mut end = bank.len() - size;
+  let mut digits = vec![];
+  for _ in 1..=size {
+    let selected = indexed[start..=end]
+      .iter()
       .max_by(|(i1, x), (i2, y)| match x.cmp(y) {
         Ordering::Equal => i2.cmp(i1),
         other => other,
-      })
-      .ok_or("Must have at least 2 elements in a battery bank")?;
+      });
 
-    let second_digit = bank[(idx + 1)..]
-      .iter()
-      .max()
-      .ok_or("Must have at least 2 elements in a battery bank")?;
+    let (idx, digit) = match selected {
+      Some((i, d)) => (*i, **d),
+      None => {
+        return Err(format!(
+          "Must have at least {} elements in a battery bank",
+          size
+        ));
+      }
+    };
 
-    Ok(first_digit * 10 + second_digit)
+    digits.push(digit);
+    start = idx + 1;
+    end += 1;
   }
 
-  pub fn solve(input: &Vec<Vec<u64>>) -> Result<u64, &'static str> {
+  Ok(
+    digits
+      .iter()
+      .rev()
+      .zip(0..)
+      .map(|(digit, power)| digit * 10u64.pow(power))
+      .sum(),
+  )
+}
+
+mod puzzle1 {
+
+  use super::maximize_bank;
+
+  pub fn solve(input: &Vec<Vec<u64>>) -> Result<u64, String> {
     let joltages = input
       .iter()
-      .map(|bank| maximize_bank(bank))
-      .collect::<Result<Vec<_>, &'static str>>()?;
+      .map(|bank| maximize_bank(bank, 2))
+      .collect::<Result<Vec<_>, _>>()?;
 
     Ok(joltages.iter().sum())
   }
 }
 
 mod puzzle2 {
-  use std::cmp::Ordering;
 
-  pub fn maximize_bank(bank: &[u64]) -> Result<u64, &'static str> {
-    let indexed = (0..).zip(bank).collect::<Vec<_>>();
-    let mut start = 0;
-    let mut end = bank.len() - 12;
-    let mut digits = vec![];
-    for _ in 1..=12 {
-      let selected = indexed[start..=end]
-        .iter()
-        .max_by(|(i1, x), (i2, y)| match x.cmp(y) {
-          Ordering::Equal => i2.cmp(i1),
-          other => other,
-        });
+  use super::maximize_bank;
 
-      let (idx, digit) = match selected {
-        Some((i, d)) => (*i, **d),
-        None => return Err("Must have at least 12 elements in a battery bank"),
-      };
-
-      digits.push(digit);
-      start = idx + 1;
-      end += 1;
-    }
-
-    Ok(
-      digits
-        .iter()
-        .rev()
-        .zip(0..)
-        .map(|(digit, power)| digit * 10u64.pow(power))
-        .sum(),
-    )
-  }
-
-  pub fn solve(input: &Vec<Vec<u64>>) -> Result<u64, &'static str> {
+  pub fn solve(input: &Vec<Vec<u64>>) -> Result<u64, String> {
     let joltages = input
       .iter()
-      .map(|bank| maximize_bank(bank))
-      .collect::<Result<Vec<_>, &'static str>>()?;
+      .map(|bank| maximize_bank(bank, 12))
+      .collect::<Result<Vec<_>, _>>()?;
 
     Ok(joltages.iter().sum())
   }
@@ -109,13 +100,13 @@ mod tests {
     #[test]
     fn test_maximize_bank() {
       let bank = parse_battery_bank("987654321111111").unwrap();
-      assert_eq!(maximize_bank(&bank).unwrap(), 98);
+      assert_eq!(maximize_bank(&bank, 2).unwrap(), 98);
       let bank = parse_battery_bank("811111111111119").unwrap();
-      assert_eq!(maximize_bank(&bank).unwrap(), 89);
+      assert_eq!(maximize_bank(&bank, 2).unwrap(), 89);
       let bank = parse_battery_bank("234234234234278").unwrap();
-      assert_eq!(maximize_bank(&bank).unwrap(), 78);
+      assert_eq!(maximize_bank(&bank, 2).unwrap(), 78);
       let bank = parse_battery_bank("818181911112111").unwrap();
-      assert_eq!(maximize_bank(&bank).unwrap(), 92);
+      assert_eq!(maximize_bank(&bank, 2).unwrap(), 92);
     }
 
     #[test]
@@ -143,13 +134,13 @@ mod tests {
     #[test]
     fn test_maximize_bank() {
       let bank = parse_battery_bank("987654321111111").unwrap();
-      assert_eq!(maximize_bank(&bank).unwrap(), 987654321111);
+      assert_eq!(maximize_bank(&bank, 12).unwrap(), 987654321111);
       let bank = parse_battery_bank("811111111111119").unwrap();
-      assert_eq!(maximize_bank(&bank).unwrap(), 811111111119);
+      assert_eq!(maximize_bank(&bank, 12).unwrap(), 811111111119);
       let bank = parse_battery_bank("234234234234278").unwrap();
-      assert_eq!(maximize_bank(&bank).unwrap(), 434234234278);
+      assert_eq!(maximize_bank(&bank, 12).unwrap(), 434234234278);
       let bank = parse_battery_bank("818181911112111").unwrap();
-      assert_eq!(maximize_bank(&bank).unwrap(), 888911112111);
+      assert_eq!(maximize_bank(&bank, 12).unwrap(), 888911112111);
     }
 
     #[test]
