@@ -9,7 +9,11 @@ struct GraphManager<T> {
 
 struct Graph<T> {
   nodes: Vec<GraphNode<T>>,
-  size: usize,
+}
+impl<T> Graph<T> {
+  fn size(&self) -> usize {
+    self.nodes.len()
+  }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -31,10 +35,7 @@ where
 
   fn create_graph(&mut self) -> usize {
     let id = self.graphs.len();
-    self.graphs.push(Graph {
-      nodes: Vec::new(),
-      size: 0,
-    });
+    self.graphs.push(Graph { nodes: Vec::new() });
     id
   }
 
@@ -42,7 +43,6 @@ where
     let node = GraphNode { value, graph_id };
     self.lookup.insert(node.value.clone(), graph_id);
     self.graphs[graph_id].nodes.push(node);
-    self.graphs[graph_id].size += 1;
   }
 
   fn merge_graphs(&mut self, target_id: usize, source_id: usize) {
@@ -50,16 +50,12 @@ where
       return;
     }
     let source_nodes = std::mem::take(&mut self.graphs[source_id].nodes);
-    let source_size = self.graphs[source_id].size;
-
-    self.graphs[target_id].size += source_size;
     for mut node in source_nodes {
       node.graph_id = target_id; // Update the graph reference
       self.lookup.insert(node.value.clone(), target_id);
       self.graphs[target_id].nodes.push(node);
     }
 
-    self.graphs[source_id].size = 0;
     self.graphs[source_id].nodes.clear();
   }
 }
@@ -93,21 +89,20 @@ fn distance(a: &Junction, b: &Junction) -> f64 {
   )
 }
 
-fn closest_n_pairs(input: &Vec<Junction>, n: usize) -> Vec<(&Junction, &Junction)> {
+fn closest_pairs(input: &Vec<Junction>) -> Vec<(&Junction, &Junction)> {
   let mut pairs = input
     .iter()
     .flat_map(|a| {
       input
         .iter()
-        .filter(|b| a != *b)
-        .map(|b| (a, b, distance(a, b)))
-        .collect::<Vec<(&Junction, &Junction, f64)>>()
+        .filter(move |b| a != *b)
+        .map(move |b| (a, b, distance(a, b)))
     })
     .collect::<Vec<_>>();
 
   pairs.sort_by(|(_, _, a_distance), (_, _, b_distance)| a_distance.total_cmp(b_distance));
 
-  let pairs_with_dupes = pairs.iter().take(n * 2).map(|(a, b, _)| (*a, *b));
+  let pairs_with_dupes = pairs.iter().map(|(a, b, _)| (*a, *b));
 
   pairs_with_dupes
     .zip(0..)
@@ -116,51 +111,104 @@ fn closest_n_pairs(input: &Vec<Junction>, n: usize) -> Vec<(&Junction, &Junction
     .collect::<Vec<(&Junction, &Junction)>>()
 }
 
-fn solve(input: &mut Vec<Junction>, n_connections: usize) -> usize {
-  let mut manager = GraphManager::<Junction>::new();
+mod puzzle1 {
+  use super::*;
 
-  let pairs = closest_n_pairs(input, n_connections);
+  pub fn solve(input: &Vec<Junction>, n_connections: usize) -> usize {
+    let mut manager = GraphManager::<Junction>::new();
 
-  for pair in pairs.iter().take(n_connections) {
-    let (a, b) = pair;
+    let pairs = closest_pairs(input);
 
-    let a_graph_id = manager.lookup.get(a);
-    let b_graph_id = manager.lookup.get(b);
+    for pair in pairs.iter().take(n_connections) {
+      let (a, b) = pair;
 
-    match (a_graph_id, b_graph_id) {
-      (Some(a_graph), Some(b_graph)) => manager.merge_graphs(*a_graph, *b_graph),
-      (Some(a_graph), None) => manager.add_node(*a_graph, **b),
-      (None, Some(b_graph)) => manager.add_node(*b_graph, **a),
-      (None, None) => {
-        let new_graph_id = manager.create_graph();
-        manager.add_node(new_graph_id, **a);
-        manager.add_node(new_graph_id, **b);
-      }
-    };
+      let a_graph_id = manager.lookup.get(a);
+      let b_graph_id = manager.lookup.get(b);
+
+      match (a_graph_id, b_graph_id) {
+        (Some(a_graph), Some(b_graph)) => manager.merge_graphs(*a_graph, *b_graph),
+        (Some(a_graph), None) => manager.add_node(*a_graph, **b),
+        (None, Some(b_graph)) => manager.add_node(*b_graph, **a),
+        (None, None) => {
+          let new_graph_id = manager.create_graph();
+          manager.add_node(new_graph_id, **a);
+          manager.add_node(new_graph_id, **b);
+        }
+      };
+    }
+
+    let mut sorted_graphs = manager
+      .graphs
+      .iter()
+      .clone()
+      .collect::<Vec<&Graph<Junction>>>();
+
+    sorted_graphs.sort_by(|a, b| b.size().cmp(&a.size()));
+    let three_largest_graphs = sorted_graphs[0..3].to_vec();
+    let size = three_largest_graphs
+      .iter()
+      .map(|graph| graph.size())
+      .product::<usize>();
+
+    size
   }
+}
 
-  let mut sorted_graphs = manager
-    .graphs
-    .iter()
-    .clone()
-    .collect::<Vec<&Graph<Junction>>>();
+mod puzzle2 {
+  use std::collections::VecDeque;
 
-  sorted_graphs.sort_by(|a, b| b.size.cmp(&a.size));
-  let three_largest_graphs = sorted_graphs[0..3].to_vec();
-  let size = three_largest_graphs
-    .iter()
-    .map(|graph| graph.size)
-    .product::<usize>();
+  use super::*;
 
-  size
+  pub fn solve(input: &Vec<Junction>) -> Result<i64, String> {
+    let mut manager = GraphManager::<Junction>::new();
+
+    let mut pairs = VecDeque::from(closest_pairs(input));
+
+    let mut last_pair = None;
+    while last_pair == None
+      || manager
+        .graphs
+        .iter()
+        .any(|graph| 0 < graph.size() && graph.size() < input.len())
+    {
+      let (a, b) = match pairs.pop_front() {
+        Some(pair) => pair,
+        None => return Err("No more pairs to process".to_string()),
+      };
+
+      last_pair = Some((a, b));
+
+      let a_graph_id = manager.lookup.get(a);
+      let b_graph_id = manager.lookup.get(b);
+
+      match (a_graph_id, b_graph_id) {
+        (Some(a_graph), Some(b_graph)) => manager.merge_graphs(*a_graph, *b_graph),
+        (Some(a_graph), None) => manager.add_node(*a_graph, *b),
+        (None, Some(b_graph)) => manager.add_node(*b_graph, *a),
+        (None, None) => {
+          let new_graph_id = manager.create_graph();
+          manager.add_node(new_graph_id, *a);
+          manager.add_node(new_graph_id, *b);
+        }
+      };
+    }
+
+    match last_pair {
+      Some(((ax, _, _), (bx, _, _))) => Ok(*ax * *bx),
+      None => Err("No pairs were processed".to_string()),
+    }
+  }
 }
 
 pub fn run() {
   let input = shared::load_input_lines("day8.txt").unwrap();
-  let mut parsed_input = parse_input(&input).unwrap();
+  let parsed_input = parse_input(&input).unwrap();
 
-  let result = solve(&mut parsed_input, 1000);
-  println!("Day 8, Result: {}", result);
+  let result1 = puzzle1::solve(&parsed_input, 1000);
+  println!("Day 8, Puzzle 1: {}", result1);
+
+  let result2 = puzzle2::solve(&parsed_input).unwrap();
+  println!("Day 8, Puzzle 2: {}", result2);
 }
 
 #[cfg(test)]
@@ -197,8 +245,9 @@ mod tests {
 
   #[test]
   fn test_closest_pairs() {
-    let result = closest_n_pairs(&PARSED_INPUT, 2)
+    let result = closest_pairs(&PARSED_INPUT)
       .iter()
+      .take(2)
       .map(|(a, b)| ((**a).clone(), (**b).clone()))
       .collect::<Vec<(Junction, Junction)>>();
     assert_eq!(
@@ -210,10 +259,25 @@ mod tests {
     );
   }
 
-  #[test]
-  fn test_solve_puzzle1() {
-    let mut input = PARSED_INPUT.clone();
-    let result = solve(&mut input, 10);
-    assert_eq!(result, 40);
+  mod puzzle1 {
+    use super::super::puzzle1::solve;
+    use super::*;
+
+    #[test]
+    fn test_solve_puzzle1() {
+      let result = solve(&PARSED_INPUT, 10);
+      assert_eq!(result, 40);
+    }
+  }
+
+  mod puzzle2 {
+    use super::super::puzzle2::solve;
+    use super::*;
+
+    #[test]
+    fn test_solve_puzzle2() {
+      let result = solve(&PARSED_INPUT).unwrap();
+      assert_eq!(result, 25272);
+    }
   }
 }
