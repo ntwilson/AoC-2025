@@ -38,17 +38,7 @@ mod puzzle2 {
       .or_insert(value);
   }
 
-  fn remove_beam(beams: &mut HashMap<usize, i64>, col: usize) {
-    if let Some(counter) = beams.get_mut(&col) {
-      *counter -= 1;
-      if *counter <= 0 {
-        beams.remove(&col);
-      }
-    }
-  }
-
   pub fn solve(input: &Vec<String>) -> i64 {
-    //HashMap<usize, i64> {
     let mut beams = HashMap::new();
     for line in input {
       let chars = line.chars().collect::<Vec<char>>();
